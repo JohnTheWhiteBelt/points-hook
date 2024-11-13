@@ -84,7 +84,6 @@ contract PointsHook is BaseHook, ERC20 {
         return (this.afterSwap.selector, 0);
     }
 
-    // Stub implementation for `afterAddLiquidity`
     function afterAddLiquidity(
         address,
         PoolKey calldata key,
@@ -93,7 +92,16 @@ contract PointsHook is BaseHook, ERC20 {
         BalanceDelta,
         bytes calldata hookData
     ) external override onlyPoolManager returns (bytes4, BalanceDelta) {
-        // We'll add more code here shortly
+        // If this is not an ETH-TOKEN pool with this hook attached, ignore
+        if (!key.currency0.isAddressZero())
+            return (this.afterSwap.selector, delta);
+
+        // Mint points equivalent to how much ETH they're adding in liquidity
+        uint256 pointsForAddingLiquidity = uint256(int256(-delta.amount0()));
+
+        // Mint the points
+        _assignPoints(hookData, pointsForAddingLiquidity);
+
         return (this.afterAddLiquidity.selector, delta);
     }
 
