@@ -19,6 +19,11 @@ contract PointsHook is BaseHook, ERC20 {
     using CurrencyLibrary for Currency;
     using BalanceDeltaLibrary for BalanceDelta;
 
+    // keep track of user => referrer
+    mapping(address => address) public referredBy;
+
+    uint256 public constant POINTS_FOR_REFERRAL = 500e18;
+
     // Initialize BaseHook and ERC20
     constructor(
         IPoolManager _manager,
@@ -105,18 +110,40 @@ contract PointsHook is BaseHook, ERC20 {
         return (this.afterAddLiquidity.selector, delta);
     }
 
-    function _assignPoints(bytes calldata hookData, uint256 points) internal {
-        // If no hookData is passed in, no points will be assigned to anyone
+    function getHookData(
+        address referer,
+        address referee
+    ) public pure returns (bytes memory) {
+        return abi.encode(referer, referee);
+    }
+
+    function _assignPoints(
+        bytes calldata hookData,
+        uint256 reffereePoints
+    ) internal {
+        // If teere is no referer or referee specified, nobody gets any points
         if (hookData.length == 0) return;
 
         // Extract user address from hookData
-        address user = abi.decode(hookData, (address));
+        (address referrer, address referree) = abi.decode(
+            hookData,
+            (address, address)
+        );
 
-        // If there is hookData but not in the format we're expecting and user address is zero
-        // nobody gets any points
-        if (user == address(0)) return;
+        if (referree == address(0)) return;
 
-        // Mint points to the user
-        _mint(user, points);
+        // set their referrer for the first time
+        if (referredBy[referree] == address(0) && referrer != address(0)) {
+            referredBy[referree] = referrer;
+            _mint(referrer, POINTS_FOR_REFERRAL);
+        }
+
+        // mint 10% of the user's earned points to the referrer
+        if (referredBy[referree] != address(0)) {
+            // Mint points to the user
+            _mint(referrer, reffereePoints / 10);
+        }
+
+        _mint(referree, reffereePoints);
     }
 }
